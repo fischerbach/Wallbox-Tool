@@ -46,7 +46,7 @@ int main(void)
 
 	//Authentication
 	curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-	curl_easy_setopt(curl, CURLOPT_USERPWD, USERPWD);
+	curl_easy_setopt(curl, CURLOPT_USERPWD, getenv("WALLBOX_USERPWD"));
 	
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &write_chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&response); 
