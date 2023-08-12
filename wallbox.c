@@ -4,6 +4,8 @@
 #include <curl/curl.h>
 #include <json-c/json.h>
 
+#include "dbg.h"
+
 #define BASE_URL "https://api.wall-box.com/"
 #define AUTH_URL "https://user-api.wall-box.com/users/signin"
 #define USERPWD "email:password"
@@ -26,9 +28,8 @@ int main(void)
 
 	curl = curl_easy_init();
 	curl_global_init(CURL_GLOBAL_ALL);
-	if (curl == NULL) {
-		die("HTTP request fail\n");
-	}
+	check(curl != NULL, "HTTP request fail\n");
+
 
 	Response response;
 	response.string = malloc(1);
@@ -54,9 +55,7 @@ int main(void)
 
 	result = curl_easy_perform(curl);
 
-	if (result != CURLE_OK) {
-		die(curl_easy_strerror(result));
-	}
+	check(result == CURLE_OK, "%s", curl_easy_strerror(result));
 
 	printf("%s\n", response.string);
 
@@ -80,6 +79,10 @@ int main(void)
 	free(response.string);
 
 	return 0;
+
+error:
+	curl_easy_cleanup(curl);
+	exit(-1);
 }
 
 size_t write_chunk (void *data, size_t size, size_t nmemb, void *userdata)
@@ -90,10 +93,7 @@ size_t write_chunk (void *data, size_t size, size_t nmemb, void *userdata)
 	
 	char *ptr = realloc(response->string, response->size + real_size + 1);
 
-	if (ptr == NULL) {
-		return 0;
-		// return CURL_WRITEFUNC_ERROR; ??
-	}
+	check_mem(ptr);
 
 	response->string = ptr;
 	memcpy(&(response->string[response->size]), data, real_size);
@@ -102,6 +102,9 @@ size_t write_chunk (void *data, size_t size, size_t nmemb, void *userdata)
 
 
 	return real_size;
+
+error:
+	return 0;
 }
 
 void die (const char *message)
