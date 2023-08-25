@@ -1,6 +1,14 @@
 {
 	"files.associations": {
 		"*.embeddedhtml": "html",
-		"dbg.h": "c"
+		"dbg.h": "c",
+		"__locale": "c",
+		"cstring": "c",
+		"typeinfo": "c",
+		"json.h": "c",
+		"chrono": "cpp",
+		"ctime": "cpp",
+		"condition_variable": "cpp",
+		"mutex": "cpp"
 	}
 }

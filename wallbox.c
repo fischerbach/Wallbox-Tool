@@ -1,27 +1,60 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <curl/curl.h>
 #include <json-c/json.h>
 
 #include "dbg.h"
+#define SV_IMPLEMENTATION
+#include "sv.h"
 
 #define BASE_URL "https://api.wall-box.com/"
 #define AUTH_URL "https://user-api.wall-box.com/users/signin"
-#define USERPWD "email:password"
 
 typedef struct {
 	char *string;
 	size_t size;
 } Response;
 
+typedef struct {
+	String_View token;
+	time_t token_expiration_date;
+} Wallbox;
 
-void die (const char *message);
-size_t write_chunk (void *data, size_t size, size_t nmemb, void *userdata);
-
-
-int main(void)
+time_t wallbox_get_expiration_time_from_now(void)
 {
+	time_t currentTime;
+	time(&currentTime);
+	return currentTime + 14 * 24 * 3600;
+} 
+
+
+size_t write_chunk (void *data, size_t size, size_t nmemb, void *userdata)
+{
+	size_t real_size = size * nmemb;
+
+	Response *response = (Response *) userdata;
+	
+	char *ptr = realloc(response->string, response->size + real_size + 1);
+
+	check_mem(ptr);
+
+	response->string = ptr;
+	memcpy(&(response->string[response->size]), data, real_size);
+	response->size += real_size;
+	response->string[response->size] = '\0'; // =0
+
+
+	return real_size;
+
+error:
+	return 0;
+}
+
+String_View wallbox_get_token(char *user_pwd)
+{
+
 	CURL *curl;
 	struct curl_slist *header = NULL;
 	CURLcode result;
@@ -47,7 +80,7 @@ int main(void)
 
 	//Authentication
 	curl_easy_setopt(curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-	curl_easy_setopt(curl, CURLOPT_USERPWD, getenv("WALLBOX_USERPWD"));
+	curl_easy_setopt(curl, CURLOPT_USERPWD, user_pwd);
 	
 	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &write_chunk);
 	curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&response); 
@@ -71,44 +104,28 @@ int main(void)
 	json_object_object_get_ex(attributes, "user_id", &user_id);
 	json_object_object_get_ex(attributes, "token", &token);
 
-	printf("user_id: %s\n", json_object_get_string(user_id));
-	printf("token: %s\n", json_object_get_string(token));
+	String_View token_sv = sv_from_cstr(json_object_get_string(token));
 
 	curl_easy_cleanup(curl);
 
 	free(response.string);
 
-	return 0;
+	return token_sv;
 
 error:
 	curl_easy_cleanup(curl);
 	exit(-1);
 }
 
-size_t write_chunk (void *data, size_t size, size_t nmemb, void *userdata)
+int main(void)
 {
-	size_t real_size = size * nmemb;
 
-	Response *response = (Response *) userdata;
-	
-	char *ptr = realloc(response->string, response->size + real_size + 1);
+	Wallbox wallbox = {
+		.token = wallbox_get_token(getenv("WALLBOX_USERPWD")),
+		.token_expiration_date = wallbox_get_expiration_time_from_now()
+	};
 
-	check_mem(ptr);
+	printf("token: " SV_Fmt "\n", SV_Arg(wallbox.token));
+	printf("expiration date: %d", (uint32_t)wallbox.token_expiration_date);
 
-	response->string = ptr;
-	memcpy(&(response->string[response->size]), data, real_size);
-	response->size += real_size;
-	response->string[response->size] = '\0'; // =0
-
-
-	return real_size;
-
-error:
-	return 0;
-}
-
-void die (const char *message)
-{
-	fprintf(stderr, "ERROR: %s\n", message);
-	exit(-1);
 }
